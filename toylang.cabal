@@ -1,0 +1,74 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: b55b8d782baeffb3b487b3751e84d3b7e8ecc614964b55f634cea4c9963832c1
+
+name:           toylang
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/takataka3131/toylang#readme>
+homepage:       https://github.com/takataka3131/toylang#readme
+bug-reports:    https://github.com/takataka3131/toylang/issues
+author:         taka2
+maintainer:     taka23131@gmail.com
+copyright:      2021 taka2
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/takataka3131/toylang
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_toylang
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , llvm-hs-pretty
+    , llvm-hs-pure
+    , megaparsec
+    , text
+  default-language: Haskell2010
+
+executable toylang-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_toylang
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , llvm-hs-pretty
+    , llvm-hs-pure
+    , megaparsec
+    , text
+    , toylang
+  default-language: Haskell2010
+
+test-suite toylang-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_toylang
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , llvm-hs-pretty
+    , llvm-hs-pure
+    , megaparsec
+    , text
+    , toylang
+  default-language: Haskell2010

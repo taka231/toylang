@@ -13,10 +13,17 @@ import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Instruction
 import LLVM.IRBuilder.Constant
 
-main :: IO ()
 main = do
-    n <- read <$> getLine   -- 標準入力から1行を読んで整数として解釈する
-    LT.putStrLn $ ppllvm $  -- LLVM IRをテキスト表現として表示する
-        buildModule "main" $ do
-            function "main" [] i32 $ \[] ->
-                ret (int32 n)
+    -- "12+34" のような入力から整数2つを取り出して n, m とする
+    [n, m] <- map read . split '+' <$> getContents
+    LT.putStrLn $
+        ppllvm $ buildModule "main" $ do
+        function "main" [] i32 $ \[] -> do
+            a <- add (int32 n) (int32 m)
+            ret a
+
+split :: Char -> String -> [String]
+split c s = case dropWhile (== c) s of
+  "" -> []
+  s1 -> w : split c s2
+    where (w, s2) = break (== c) s1

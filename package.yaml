@@ -25,6 +25,7 @@ dependencies:
 - llvm-hs-pure
 - text
 - llvm-hs-pretty
+- parser-combinators
 
 library:
   source-dirs: src

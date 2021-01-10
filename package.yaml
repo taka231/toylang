@@ -26,6 +26,8 @@ dependencies:
 - text
 - llvm-hs-pretty
 - parser-combinators
+- containers
+- transformers
 
 library:
   source-dirs: src

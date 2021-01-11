@@ -28,11 +28,14 @@ symbol :: String -> Parser String
 symbol = L.symbol sc
 
 identifier :: Parser String
-identifier = lexeme $ do
+identifier = do
   firstLetter <- letterChar
   middleLetters <- many ( oneOf (['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['_']) )
   lastLetters <- many (oneOf "!?_'")
   pure $ firstLetter : (middleLetters ++ lastLetters)
+
+scIdentifier :: Parser String
+scIdentifier = lexeme identifier
 
 num :: Parser Integer
 num = lexeme L.decimal
@@ -59,17 +62,37 @@ exprIf = do
     symbol "else"      -- "else" も同様
     ExprIf condExpr thenExpr <$> expr -- 全体を ExprIf でくるむ
 
-statement :: Parser Statement
-statement = try (do
-  variname <- Var <$> identifier -- 変数名を見つけたら Var にくるむ
+assign :: Parser Statement
+assign = do
+  variname <- Var <$> scIdentifier -- 変数名を見つけたら Var にくるむ
   symbol "="
-  Assign variname <$> expr) <|> StateExpr <$> expr
+  Assign variname <$> expr
+
+funDef :: Parser Statement
+funDef = dbg "funDef" $ lexeme $ do
+    funName <- identifier
+    args <- some $ try $ do
+      some $ char ' '
+      identifier
+    many $ char ' '
+    symbol "="
+    FunDef funName args <$> expr
+
+funCall :: Parser Expr
+funCall = dbg "funCall" $ lexeme $ do
+    name <- identifier
+    some $ char ' '
+    args <- some $ Var <$> scIdentifier <|> expr
+    pure $ FunCall name args
+
+statement :: Parser Statement
+statement = try funDef <|> try assign <|> StateExpr <$> expr
 
 expr :: Parser Expr
 expr = makeExprParser term ops
 
 term :: Parser Expr
-term = ExprInt <$> num <|> parens expr <|> exprIf <|> Var <$> identifier
+term = ExprInt <$> num <|> parens expr <|> exprIf <|> try funCall <|> Var <$> scIdentifier
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")

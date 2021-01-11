@@ -12,9 +12,11 @@ data Expr =            -- 式
    | ExprGT Expr Expr
    | ExprEQLT Expr Expr
    | ExprEQGT Expr Expr
+   | FunCall String [Expr]
    deriving Show
 
 data Statement =
    Assign Expr Expr
+   | FunDef String [String] Expr
    | StateExpr Expr
    deriving Show

@@ -15,6 +15,9 @@ assert() {
 }
 
 assert 32 32
+assert 10 "#comment; 10"
+assert 10 "/* comment
+*/ 10"
 assert 2 "1+1"
 assert 38 "15+23"
 assert 40 "13 + 32 - 5"

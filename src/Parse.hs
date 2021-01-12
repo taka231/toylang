@@ -69,7 +69,7 @@ assign = do
   Assign variname <$> expr
 
 funDef :: Parser Statement
-funDef = dbg "funDef" $ lexeme $ do
+funDef = lexeme $ do
     funName <- identifier
     args <- some $ try $ do
       some $ char ' '
@@ -79,10 +79,10 @@ funDef = dbg "funDef" $ lexeme $ do
     FunDef funName args <$> expr
 
 funCall :: Parser Expr
-funCall = dbg "funCall" $ lexeme $ do
+funCall = lexeme $ do
     name <- identifier
     some $ char ' '
-    args <- some $ Var <$> scIdentifier <|> expr
+    args <- some $ Var <$> scIdentifier <|> term
     pure $ FunCall name args
 
 statement :: Parser Statement

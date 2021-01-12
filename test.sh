@@ -15,7 +15,8 @@ assert() {
 }
 
 assert 32 32
-assert 10 "#comment; 10"
+assert 10 "# comment
+10"
 assert 10 "/* comment
 */ 10"
 assert 2 "1+1"
@@ -28,5 +29,6 @@ assert 3 "if 1 < 2 then 3 else 4"
 assert 4 "if 1 > 2 then 3 else 4"
 assert 3 "if 2 <= 2 then 3 else 4"
 assert 4 "if 1 >= 2 then 3 else 4"
+assert 30 "add x y = x + y; add 10 20;"
 
 echo OK

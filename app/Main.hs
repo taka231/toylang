@@ -8,6 +8,5 @@ main :: IO ()
 main = do
   str <- getContents
   let ast = parseStatement str
-  print ast
-  let llvm = compileToLLVM ast
+      llvm = compileToLLVM ast
   LT.putStrLn llvm

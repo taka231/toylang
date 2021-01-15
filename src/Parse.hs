@@ -47,7 +47,8 @@ ops =
     , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
     [ InfixL (ExprAdd <$ symbol "+")
     , InfixL (ExprSub <$ symbol "-") ],
-    [ InfixL (ExprEQGT <$ symbol ">=")
+    [ InfixL (ExprEQ <$ symbol "==")
+    , InfixL (ExprEQGT <$ symbol ">=")
     , InfixL (ExprEQLT <$ symbol "<=")
     , InfixL (ExprGT <$ symbol ">")
     , InfixL (ExprLT <$ symbol "<") ]

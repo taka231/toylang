@@ -29,6 +29,8 @@ assert 3 "if 1 < 2 then 3 else 4"
 assert 4 "if 1 > 2 then 3 else 4"
 assert 3 "if 2 <= 2 then 3 else 4"
 assert 4 "if 1 >= 2 then 3 else 4"
+assert 3 "if 1 == 1 then 3 else 4"
 assert 30 "add x y = x + y; add 10 20;"
+assert 55 "fib n = if n <= 2 then 1 else fib (n - 1) + fib (n - 2); fib 10"
 
 echo OK

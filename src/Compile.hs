@@ -104,6 +104,10 @@ compileExpr (ExprEQGT e1 e2) = do
   e1' <- compileExpr e1
   e2' <- compileExpr e2
   icmp P.SGE e1' e2'
+compileExpr (ExprEQ e1 e2) = do
+  e1' <- compileExpr e1
+  e2' <- compileExpr e2
+  icmp P.EQ e1' e2'
 compileExpr (FunCall funName exprs) = do
   env <- get                           -- 環境を取り出して
   oprs <- mapM compileExpr exprs       -- 引数を順にコンパイルする

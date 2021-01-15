@@ -8,6 +8,7 @@ data Expr =            -- 式
    | ExprInt Integer   -- 式の中身が整数一個
    | Var String
    | ExprIf Expr Expr Expr
+   | ExprEQ Expr Expr
    | ExprLT Expr Expr
    | ExprGT Expr Expr
    | ExprEQLT Expr Expr

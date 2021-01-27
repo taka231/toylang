@@ -1,24 +1,52 @@
 module Parse where
 
-import AST
-import Control.Monad.Combinators.Expr
-import Data.Text.Internal.Lazy
-import Data.Functor.Identity
-import Data.Void
-import qualified Data.Text as DT
-import qualified Data.Text.IO as T
-import qualified Data.Text.Lazy.IO as LT
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
-import Text.Megaparsec.Debug (dbg)
+import           AST
+import           Control.Monad.Combinators.Expr
+import           Control.Monad.Trans.State
+import           Data.Functor.Identity
+import qualified Data.Map                       as M
+import qualified Data.Text                      as DT
+import           Data.Text.Internal.Lazy
+import qualified Data.Text.IO                   as T
+import qualified Data.Text.Lazy.IO              as LT
+import           Data.Void
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer     as L
+import           Text.Megaparsec.Debug          (dbg)
 
-type Parser = Parsec Void String
+newtype OPDict = OP (M.Map Integer (M.Map String (Operator Parser Expr) ))
+
+type Parser = StateT OPDict (Parsec Void String)
+
+-- defaultOP :: OPDict
+-- defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (opCall "__OP__*" <$ symbol "*")), ("/", InfixL (opCall "__OP__/" <$ symbol "/"))])
+--                             ,(6, M.fromList [("+", InfixL (opCall "__OP__+" <$ symbol "+")), ("-", InfixL (opCall "__OP__-" <$ symbol "-"))])
+--                             ,(4, M.fromList [("==", InfixN (opCall "__OP__==" <$ symbol "=="))
+--                                             ,(">=", InfixN (opCall "__OP__>=" <$ symbol ">="))
+--                                             ,("<=", InfixN (opCall "__OP__<=" <$ symbol "<="))
+--                                             ,(">", InfixN (opCall "__OP__>" <$ symbol ">"))
+--                                             ,("<", InfixN (opCall "__OP__<" <$ symbol "<"))])]
+
+defaultOP :: OPDict
+defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (ExprMul <$ symbol "*")), ("/", InfixL (ExprDiv <$ symbol "/"))])
+                            ,(6, M.fromList [("+", InfixL (ExprAdd <$ symbol "+")), ("-", InfixL (ExprSub <$ symbol "-"))])
+                            ,(4, M.fromList [("==", InfixN (ExprEQ <$ symbol "=="))
+                                            ,(">=", InfixN (ExprEQGT <$ symbol ">="))
+                                            ,("<=", InfixN (ExprEQLT <$ symbol "<="))
+                                            ,(">", InfixN (ExprGT <$ symbol ">"))
+                                            ,("<", InfixN (ExprLT <$ symbol "<"))])]
+
+opdictToList :: OPDict -> [[Operator Parser Expr]]
+opdictToList (OP opdict) = map (reverse . M.elems) (reverse (M.elems opdict))
+
+opCall :: String -> Expr -> Expr -> Expr
+opCall op expr1 expr2 = FunCall op [expr1, expr2]
 
 sc :: Parser ()
 sc = L.space space1 lineCmnt blockCmnt
   where
-    lineCmnt  = L.skipLineComment "#"
+    lineCmnt  = L.skipLineComment "//"
     blockCmnt = L.skipBlockComment "/*" "*/"
 
 lexeme :: Parser a -> Parser a
@@ -31,14 +59,30 @@ identifier :: Parser String
 identifier = do
   firstLetter <- letterChar
   middleLetters <- many ( oneOf (['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['_']) )
-  lastLetters <- many (oneOf "!?_'")
+  lastLetters <- many (oneOf "_'")
   pure $ firstLetter : (middleLetters ++ lastLetters)
+
+operator :: Parser String
+operator = some (oneOf ['!', '#', '$', '%', '&', '*', '+', '.', '/', '<', '=', '>', '?', '^', '|', '-', '~'])
+
+isOperator :: String -> Bool
+isOperator = all (\char -> char `elem` ['!', '#', '$', '%', '&', '*', '+', '.', '/', '<', '=', '>', '?', '^', '|', '-', '~'])
 
 scIdentifier :: Parser String
 scIdentifier = lexeme identifier
 
 num :: Parser Integer
 num = lexeme L.decimal
+
+op :: Char -> String -> (String, Operator Parser Expr)
+op inf funName= let
+  inf' | inf == 'L' = InfixL
+       | inf == 'R' = InfixR
+       | otherwise = InfixN
+  funName' = if isOperator funName then "__OP__" ++ funName else funName
+  opName = if isOperator funName then funName else '`' : funName ++ "`"
+  in
+   (opName, inf' (opCall funName' <$ symbol opName))
 
 ops :: [[Operator Parser Expr]]
 ops =
@@ -69,13 +113,40 @@ assign = do
   symbol "="
   Assign variname <$> expr
 
+infixDef :: String -> Parser (Integer, (String, Operator Parser Expr))
+infixDef funName = do
+  symbol "infix"
+  inf <- char 'L' <|> char 'R' <|> char 'N'
+  some $ char ' '
+  pri <- num
+  return (pri, op inf funName)
+
+funInfo :: Parser Statement
+funInfo = do
+  funName <- (do
+    symbol "("
+    op <- operator
+    symbol ")"
+    return op) <|> scIdentifier
+  (pri, (opname, opInfix)) <- do
+    char '@'
+    char '('
+    inf <- infixDef funName
+    char ')'
+    return inf
+  OP opdict <- get
+  put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
+  return Info
+
 funDef :: Parser Statement
 funDef = lexeme $ do
-    funName <- identifier
-    args <- some $ try $ do
-      some $ char ' '
-      identifier
-    many $ char ' '
+    funName <- (do
+      symbol "("
+      op <- operator
+      symbol ")"
+      return $ "__OP__" ++ op
+      ) <|> scIdentifier
+    args <- some scIdentifier
     symbol "="
     FunDef funName args <$> expr
 
@@ -87,10 +158,12 @@ funCall = lexeme $ do
     pure $ FunCall name args
 
 statement :: Parser Statement
-statement = try funDef <|> try assign <|> StateExpr <$> expr
+statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 
 expr :: Parser Expr
-expr = makeExprParser term ops
+expr = do
+  opdict <- get
+  makeExprParser term (opdictToList opdict)
 
 term :: Parser Expr
 term = ExprInt <$> num <|> parens expr <|> exprIf <|> try funCall <|> Var <$> scIdentifier
@@ -102,6 +175,6 @@ statements :: Parser [Statement]       -- 行の区切りは ';'
 statements = statement `sepEndBy` symbol ";"
 
 parseStatement :: String -> [Statement]
-parseStatement str = case parse (sc *> statements) "<stdin>" str of
-  Right ast -> ast
+parseStatement str = case parse (evalStateT (sc *> statements) defaultOP) "<stdin>" str of
+  Right ast   -> ast
   Left bundle -> error $ errorBundlePretty bundle

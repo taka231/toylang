@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - megaparsec
 - llvm-hs-pure
+- llvm-hs
 - text
 - llvm-hs-pretty
 - parser-combinators

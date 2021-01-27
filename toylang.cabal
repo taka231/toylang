@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0a4e74d7764e76aa24dcc439348834ac46526dd172c7f756d3e7e622362f80d2
+-- hash: 723ca509bda024556c559362127e82ba065c72c96b1d09e711288c6815b5f753
 
 name:           toylang
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , llvm-hs
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec
@@ -55,6 +56,7 @@ executable toylang-exe
   build-depends:
       base >=4.7 && <5
     , containers
+    , llvm-hs
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec
@@ -75,6 +77,7 @@ test-suite toylang-test
   build-depends:
       base >=4.7 && <5
     , containers
+    , llvm-hs
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec

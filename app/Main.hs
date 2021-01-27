@@ -1,8 +1,8 @@
 module Main where
 
-import Compile
+import           Compile
 import qualified Data.Text.Lazy.IO as LT
-import Parse
+import           Parse
 
 main :: IO ()
 main = do

@@ -1,22 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo       #-}
 module Compile where
 
-import AST
-import Control.Monad.Fix
-import Control.Monad.Trans.State
-import qualified Data.Map as M
-import Data.String
-import LLVM.Pretty
-import LLVM.AST hiding (function, value)
-import LLVM.AST.AddrSpace
-import LLVM.AST.Constant as AST
-import LLVM.AST.IntegerPredicate as P
-import LLVM.AST.Type as AST
-import LLVM.IRBuilder.Module
-import LLVM.IRBuilder.Monad
-import LLVM.IRBuilder.Instruction
-import LLVM.IRBuilder.Constant
+import           AST
+import           Control.Monad.Fix
+import           Control.Monad.Trans.State
+import qualified Data.Map                   as M
+import           Data.String
+import           LLVM.AST                   hiding (function, value)
+import           LLVM.AST.AddrSpace
+import           LLVM.AST.Constant          as AST
+import           LLVM.AST.IntegerPredicate  as P
+import           LLVM.AST.Type              as AST
+import           LLVM.IRBuilder.Constant
+import           LLVM.IRBuilder.Instruction
+import           LLVM.IRBuilder.Module
+import           LLVM.IRBuilder.Monad
+import           LLVM.Pretty
 
 type Env = M.Map String Operand
 
@@ -113,10 +113,11 @@ compileExpr (FunCall funName exprs) = do
   oprs <- mapM compileExpr exprs       -- 引数を順にコンパイルする
   let f = case M.lookup funName env of -- 環境から関数を探して
           Just funOperand -> funOperand    -- あればそれを使う。なければエラー
-          Nothing -> error $ "function " ++ funName ++ " not found"
+          Nothing         -> error $ "function " ++ funName ++ " not found"
   call f (zip oprs (repeat []))        -- 引数の計算結果をもとに関数を呼ぶ
 
 compileStatements :: (MonadModuleBuilder m, Control.Monad.Fix.MonadFix m, MonadIRBuilder m) => [Statement] -> StateT Env m Operand
+compileStatements (Info:es) = compileStatements es
 compileStatements [e] = compileStatement e
 compileStatements (e:es) = do
   compileStatement e

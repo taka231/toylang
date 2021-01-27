@@ -20,4 +20,5 @@ data Statement =
    Assign Expr Expr
    | FunDef String [String] Expr
    | StateExpr Expr
+   | Info
    deriving Show

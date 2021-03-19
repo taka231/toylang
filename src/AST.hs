@@ -22,3 +22,7 @@ data Statement =
    | StateExpr Expr
    | Info
    deriving Show
+
+data Type =
+   TInt
+   | TBool

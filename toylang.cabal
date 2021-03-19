@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 723ca509bda024556c559362127e82ba065c72c96b1d09e711288c6815b5f753
+-- hash: 35feb58422049f12d0791b0d159d51c12eb7f62e31db36bdcc2e63adfbbe73f9
 
 name:           toylang
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec
+    , mtl
     , parser-combinators
     , text
     , transformers
@@ -60,6 +61,7 @@ executable toylang-exe
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec
+    , mtl
     , parser-combinators
     , text
     , toylang
@@ -81,6 +83,7 @@ test-suite toylang-test
     , llvm-hs-pretty
     , llvm-hs-pure
     , megaparsec
+    , mtl
     , parser-combinators
     , text
     , toylang

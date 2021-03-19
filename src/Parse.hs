@@ -2,6 +2,7 @@ module Parse where
 
 import           AST
 import           Control.Monad.Combinators.Expr
+import           Control.Monad.State            (lift)
 import           Control.Monad.Trans.State
 import           Data.Functor.Identity
 import qualified Data.Map                       as M
@@ -17,7 +18,8 @@ import           Text.Megaparsec.Debug          (dbg)
 
 newtype OPDict = OP (M.Map Integer (M.Map String (Operator Parser Expr) ))
 
-type Parser = StateT OPDict (Parsec Void String)
+-- type Parser = StateT OPDict (Parsec Void String)
+type Parser = ParsecT Void String (Control.Monad.Trans.State.State OPDict)
 
 -- defaultOP :: OPDict
 -- defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (opCall "__OP__*" <$ symbol "*")), ("/", InfixL (opCall "__OP__/" <$ symbol "/"))])
@@ -98,6 +100,10 @@ ops =
     , InfixL (ExprLT <$ symbol "<") ]
   ]
 
+typeSig :: Parser Type
+typeSig =
+  undefined
+
 exprIf :: Parser Expr
 exprIf = do
     symbol "if"        -- まず "if" を読み
@@ -128,14 +134,13 @@ funInfo = do
     op <- operator
     symbol ")"
     return op) <|> scIdentifier
-  (pri, (opname, opInfix)) <- do
+  try $ do
     char '@'
     char '('
-    inf <- infixDef funName
+    (pri, (opname, opInfix)) <- infixDef funName
     char ')'
-    return inf
-  OP opdict <- get
-  put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
+    OP opdict <- lift get
+    lift $ put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
   return Info
 
 funDef :: Parser Statement
@@ -162,7 +167,7 @@ statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 
 expr :: Parser Expr
 expr = do
-  opdict <- get
+  opdict <- lift get
   makeExprParser term (opdictToList opdict)
 
 term :: Parser Expr
@@ -175,6 +180,6 @@ statements :: Parser [Statement]       -- 行の区切りは ';'
 statements = statement `sepEndBy` symbol ";"
 
 parseStatement :: String -> [Statement]
-parseStatement str = case parse (evalStateT (sc *> statements) defaultOP) "<stdin>" str of
+parseStatement str = case evalState (runParserT (sc *> statements) "<stdin>" str) defaultOP of
   Right ast   -> ast
   Left bundle -> error $ errorBundlePretty bundle

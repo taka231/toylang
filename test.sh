@@ -15,10 +15,10 @@ assert() {
 }
 
 assert 32 32
-assert 10 "// comment
+assert 10 "-- comment
 10"
-assert 10 "/* comment
-*/ 10"
+assert 10 "{- comment
+-} 10"
 assert 2 "1+1"
 assert 38 "15+23"
 assert 40 "13 + 32 - 5"
@@ -33,7 +33,15 @@ assert 3 "if 1 == 1 then 3 else 4"
 assert 30 "add x y = x + y; add 10 20;"
 assert 120 "fact x = if x <= 1 then 1 else x * fact (x - 1); fact 5"
 assert 55 "fib n = if n <= 2 then 1 else fib (n - 1) + fib (n - 2); fib 10"
-assert 40 "(+*) @(infix L 6); (+*) a b = (a + b) * b; 3 +* 5;"
-assert 3 'sub @(infix L 6); sub a b = a - b; 5 `sub` 2'
+assert 5 "b = 1; add' a = a + b; add' 4"
+assert 40 "(+*) @(infixL 6); (+*) a b = (a + b) * b; 3 +* 5;"
+assert 3 'sub @(infixL 8); sub a b = a - b; 5 `sub` 2'
+assert 20 "
+(#) @(infixL 9);
+(%) @(infixL 1);
+(#) a b = a + b;
+(%) a b = a * b;
+3 # 2 % 4;
+"
 
 echo OK

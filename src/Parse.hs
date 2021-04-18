@@ -11,6 +11,7 @@ import           Data.Text.Internal.Lazy
 import qualified Data.Text.IO                   as T
 import qualified Data.Text.Lazy.IO              as LT
 import           Data.Void
+import           Debug.Trace                    (trace)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer     as L
@@ -31,13 +32,20 @@ type Parser = ParsecT Void String (Control.Monad.Trans.State.State OPDict)
 --                                             ,("<", InfixN (opCall "__OP__<" <$ symbol "<"))])]
 
 defaultOP :: OPDict
-defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (ExprMul <$ symbol "*")), ("/", InfixL (ExprDiv <$ symbol "/"))])
+defaultOP = OP $ M.fromList [
+                             (7, M.fromList [("*", InfixL (ExprMul <$ symbol "*")), ("/", InfixL (ExprDiv <$ symbol "/"))])
                             ,(6, M.fromList [("+", InfixL (ExprAdd <$ symbol "+")), ("-", InfixL (ExprSub <$ symbol "-"))])
+                            ,(5, M.empty)
                             ,(4, M.fromList [("==", InfixN (ExprEQ <$ symbol "=="))
                                             ,(">=", InfixN (ExprEQGT <$ symbol ">="))
                                             ,("<=", InfixN (ExprEQLT <$ symbol "<="))
                                             ,(">", InfixN (ExprGT <$ symbol ">"))
-                                            ,("<", InfixN (ExprLT <$ symbol "<"))])]
+                                            ,("<", InfixN (ExprLT <$ symbol "<"))])
+                            ,(3, M.empty)
+                            ,(2, M.empty)
+                            ,(9, M.empty)
+                            ,(8, M.empty)
+                            ,(1, M.empty)]
 
 opdictToList :: OPDict -> [[Operator Parser Expr]]
 opdictToList (OP opdict) = map (reverse . M.elems) (reverse (M.elems opdict))
@@ -48,8 +56,8 @@ opCall op expr1 expr2 = FunCall op [expr1, expr2]
 sc :: Parser ()
 sc = L.space space1 lineCmnt blockCmnt
   where
-    lineCmnt  = L.skipLineComment "//"
-    blockCmnt = L.skipBlockComment "/*" "*/"
+    lineCmnt  = L.skipLineComment "--"
+    blockCmnt = L.skipBlockComment "{-" "-}"
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -76,29 +84,29 @@ scIdentifier = lexeme identifier
 num :: Parser Integer
 num = lexeme L.decimal
 
-op :: Char -> String -> (String, Operator Parser Expr)
+op :: String -> String -> (String, Operator Parser Expr)
 op inf funName= let
-  inf' | inf == 'L' = InfixL
-       | inf == 'R' = InfixR
+  inf' | inf == "infixL" = InfixL
+       | inf == "infixR" = InfixR
        | otherwise = InfixN
   funName' = if isOperator funName then "__OP__" ++ funName else funName
   opName = if isOperator funName then funName else '`' : funName ++ "`"
   in
-   (opName, inf' (opCall funName' <$ symbol opName))
+   (opName, inf' (try $ opCall funName' <$ symbol opName))
 
-ops :: [[Operator Parser Expr]]
-ops =
-  [
-    [ InfixL (ExprMul <$ symbol "*")   -- 掛け算は左結合で、文字は *
-    , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
-    [ InfixL (ExprAdd <$ symbol "+")
-    , InfixL (ExprSub <$ symbol "-") ],
-    [ InfixL (ExprEQ <$ symbol "==")
-    , InfixL (ExprEQGT <$ symbol ">=")
-    , InfixL (ExprEQLT <$ symbol "<=")
-    , InfixL (ExprGT <$ symbol ">")
-    , InfixL (ExprLT <$ symbol "<") ]
-  ]
+-- ops :: [[Operator Parser Expr]]
+-- ops =
+--   [
+--     [ InfixL (ExprMul <$ symbol "*")   -- 掛け算は左結合で、文字は *
+--     , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
+--     [ InfixL (ExprAdd <$ symbol "+")
+--     , InfixL (ExprSub <$ symbol "-") ],
+--     [ InfixL (ExprEQ <$ symbol "==")
+--     , InfixL (ExprEQGT <$ symbol ">=")
+--     , InfixL (ExprEQLT <$ symbol "<=")
+--     , InfixL (ExprGT <$ symbol ">")
+--     , InfixL (ExprLT <$ symbol "<") ]
+--   ]
 
 typeSig :: Parser Type
 typeSig =
@@ -121,9 +129,7 @@ assign = do
 
 infixDef :: String -> Parser (Integer, (String, Operator Parser Expr))
 infixDef funName = do
-  symbol "infix"
-  inf <- char 'L' <|> char 'R' <|> char 'N'
-  some $ char ' '
+  inf <- symbol "infixL" <|> symbol "infixR" <|> symbol "infixN"
   pri <- num
   return (pri, op inf funName)
 
@@ -168,6 +174,8 @@ statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 expr :: Parser Expr
 expr = do
   opdict <- lift get
+  let OP opdictMap = opdict
+      a = trace (show $ fmap M.keys (M.lookup 9 opdictMap)) opdict
   makeExprParser term (opdictToList opdict)
 
 term :: Parser Expr

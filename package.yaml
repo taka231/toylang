@@ -30,6 +30,7 @@ dependencies:
 - containers
 - transformers
 - mtl
+- spoon
 
 library:
   source-dirs: src

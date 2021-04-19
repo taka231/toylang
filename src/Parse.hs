@@ -84,30 +84,6 @@ scIdentifier = lexeme identifier
 num :: Parser Integer
 num = lexeme L.decimal
 
-op :: String -> String -> (String, Operator Parser Expr)
-op inf funName= let
-  inf' | inf == "infixL" = InfixL
-       | inf == "infixR" = InfixR
-       | otherwise = InfixN
-  funName' = if isOperator funName then "__OP__" ++ funName else funName
-  opName = if isOperator funName then funName else '`' : funName ++ "`"
-  in
-   (opName, inf' (try $ opCall funName' <$ symbol opName))
-
--- ops :: [[Operator Parser Expr]]
--- ops =
---   [
---     [ InfixL (ExprMul <$ symbol "*")   -- 掛け算は左結合で、文字は *
---     , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
---     [ InfixL (ExprAdd <$ symbol "+")
---     , InfixL (ExprSub <$ symbol "-") ],
---     [ InfixL (ExprEQ <$ symbol "==")
---     , InfixL (ExprEQGT <$ symbol ">=")
---     , InfixL (ExprEQLT <$ symbol "<=")
---     , InfixL (ExprGT <$ symbol ">")
---     , InfixL (ExprLT <$ symbol "<") ]
---   ]
-
 typeSig :: Parser Type
 typeSig =
   undefined
@@ -127,34 +103,32 @@ assign = do
   symbol "="
   Assign variname <$> expr
 
-infixDef :: String -> Parser (Integer, (String, Operator Parser Expr))
+infixDef :: String -> Parser ()
 infixDef funName = do
-  inf <- symbol "infixL" <|> symbol "infixR" <|> symbol "infixN"
+  inf <- InfixL <$ symbol "infixL" <|> InfixR <$ symbol "infixR" <|> InfixN <$ symbol "infixN"
   pri <- num
-  return (pri, op inf funName)
+  let funName' = if isOperator funName then "__OP__" ++ funName else funName
+      opName = if isOperator funName then funName else '`' : funName ++ "`"
+  OP opdict <- lift get
+  lift $ put $ OP (M.update (Just . M.insert opName (inf (opCall funName' <$ symbol opName))) pri opdict)
+  return ()
+  --  inf' (try $ opCall funName' <$ symbol opName))
 
 funInfo :: Parser Statement
 funInfo = do
-  funName <- (do
-    symbol "("
-    op <- operator
-    symbol ")"
-    return op) <|> scIdentifier
-  try $ do
-    char '@'
-    char '('
-    (pri, (opname, opInfix)) <- infixDef funName
-    char ')'
-    OP opdict <- lift get
-    lift $ put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
+  funName <- parens operator <|> scIdentifier
+  try $ annotation [infixDef funName]
   return Info
+
+annotation :: [Parser ()] -> Parser ()
+annotation parsers = do
+  symbol "@"
+  parens $ foldr (<|>) (pure ())  parsers
 
 funDef :: Parser Statement
 funDef = lexeme $ do
     funName <- (do
-      symbol "("
-      op <- operator
-      symbol ")"
+      op <- parens operator
       return $ "__OP__" ++ op
       ) <|> scIdentifier
     args <- some scIdentifier
@@ -163,8 +137,7 @@ funDef = lexeme $ do
 
 funCall :: Parser Expr
 funCall = lexeme $ do
-    name <- identifier
-    some $ char ' '
+    name <- scIdentifier
     args <- some $ Var <$> scIdentifier <|> term
     pure $ FunCall name args
 

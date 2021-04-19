@@ -2,6 +2,7 @@ module Parse where
 
 import           AST
 import           Control.Monad.Combinators.Expr
+import           Control.Monad.State            (lift)
 import           Control.Monad.Trans.State
 import           Data.Functor.Identity
 import qualified Data.Map                       as M
@@ -10,6 +11,7 @@ import           Data.Text.Internal.Lazy
 import qualified Data.Text.IO                   as T
 import qualified Data.Text.Lazy.IO              as LT
 import           Data.Void
+import           Debug.Trace                    (trace)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer     as L
@@ -17,7 +19,8 @@ import           Text.Megaparsec.Debug          (dbg)
 
 newtype OPDict = OP (M.Map Integer (M.Map String (Operator Parser Expr) ))
 
-type Parser = StateT OPDict (Parsec Void String)
+-- type Parser = StateT OPDict (Parsec Void String)
+type Parser = ParsecT Void String (Control.Monad.Trans.State.State OPDict)
 
 -- defaultOP :: OPDict
 -- defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (opCall "__OP__*" <$ symbol "*")), ("/", InfixL (opCall "__OP__/" <$ symbol "/"))])
@@ -29,13 +32,20 @@ type Parser = StateT OPDict (Parsec Void String)
 --                                             ,("<", InfixN (opCall "__OP__<" <$ symbol "<"))])]
 
 defaultOP :: OPDict
-defaultOP = OP $ M.fromList [(7, M.fromList [("*", InfixL (ExprMul <$ symbol "*")), ("/", InfixL (ExprDiv <$ symbol "/"))])
+defaultOP = OP $ M.fromList [
+                             (7, M.fromList [("*", InfixL (ExprMul <$ symbol "*")), ("/", InfixL (ExprDiv <$ symbol "/"))])
                             ,(6, M.fromList [("+", InfixL (ExprAdd <$ symbol "+")), ("-", InfixL (ExprSub <$ symbol "-"))])
+                            ,(5, M.empty)
                             ,(4, M.fromList [("==", InfixN (ExprEQ <$ symbol "=="))
                                             ,(">=", InfixN (ExprEQGT <$ symbol ">="))
                                             ,("<=", InfixN (ExprEQLT <$ symbol "<="))
                                             ,(">", InfixN (ExprGT <$ symbol ">"))
-                                            ,("<", InfixN (ExprLT <$ symbol "<"))])]
+                                            ,("<", InfixN (ExprLT <$ symbol "<"))])
+                            ,(3, M.empty)
+                            ,(2, M.empty)
+                            ,(9, M.empty)
+                            ,(8, M.empty)
+                            ,(1, M.empty)]
 
 opdictToList :: OPDict -> [[Operator Parser Expr]]
 opdictToList (OP opdict) = map (reverse . M.elems) (reverse (M.elems opdict))
@@ -46,8 +56,8 @@ opCall op expr1 expr2 = FunCall op [expr1, expr2]
 sc :: Parser ()
 sc = L.space space1 lineCmnt blockCmnt
   where
-    lineCmnt  = L.skipLineComment "//"
-    blockCmnt = L.skipBlockComment "/*" "*/"
+    lineCmnt  = L.skipLineComment "--"
+    blockCmnt = L.skipBlockComment "{-" "-}"
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
@@ -74,29 +84,33 @@ scIdentifier = lexeme identifier
 num :: Parser Integer
 num = lexeme L.decimal
 
-op :: Char -> String -> (String, Operator Parser Expr)
+op :: String -> String -> (String, Operator Parser Expr)
 op inf funName= let
-  inf' | inf == 'L' = InfixL
-       | inf == 'R' = InfixR
+  inf' | inf == "infixL" = InfixL
+       | inf == "infixR" = InfixR
        | otherwise = InfixN
   funName' = if isOperator funName then "__OP__" ++ funName else funName
   opName = if isOperator funName then funName else '`' : funName ++ "`"
   in
-   (opName, inf' (opCall funName' <$ symbol opName))
+   (opName, inf' (try $ opCall funName' <$ symbol opName))
 
-ops :: [[Operator Parser Expr]]
-ops =
-  [
-    [ InfixL (ExprMul <$ symbol "*")   -- 掛け算は左結合で、文字は *
-    , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
-    [ InfixL (ExprAdd <$ symbol "+")
-    , InfixL (ExprSub <$ symbol "-") ],
-    [ InfixL (ExprEQ <$ symbol "==")
-    , InfixL (ExprEQGT <$ symbol ">=")
-    , InfixL (ExprEQLT <$ symbol "<=")
-    , InfixL (ExprGT <$ symbol ">")
-    , InfixL (ExprLT <$ symbol "<") ]
-  ]
+-- ops :: [[Operator Parser Expr]]
+-- ops =
+--   [
+--     [ InfixL (ExprMul <$ symbol "*")   -- 掛け算は左結合で、文字は *
+--     , InfixL (ExprDiv <$ symbol "/") ],-- 割り算も同様
+--     [ InfixL (ExprAdd <$ symbol "+")
+--     , InfixL (ExprSub <$ symbol "-") ],
+--     [ InfixL (ExprEQ <$ symbol "==")
+--     , InfixL (ExprEQGT <$ symbol ">=")
+--     , InfixL (ExprEQLT <$ symbol "<=")
+--     , InfixL (ExprGT <$ symbol ">")
+--     , InfixL (ExprLT <$ symbol "<") ]
+--   ]
+
+typeSig :: Parser Type
+typeSig =
+  undefined
 
 exprIf :: Parser Expr
 exprIf = do
@@ -115,9 +129,7 @@ assign = do
 
 infixDef :: String -> Parser (Integer, (String, Operator Parser Expr))
 infixDef funName = do
-  symbol "infix"
-  inf <- char 'L' <|> char 'R' <|> char 'N'
-  some $ char ' '
+  inf <- symbol "infixL" <|> symbol "infixR" <|> symbol "infixN"
   pri <- num
   return (pri, op inf funName)
 
@@ -128,14 +140,13 @@ funInfo = do
     op <- operator
     symbol ")"
     return op) <|> scIdentifier
-  (pri, (opname, opInfix)) <- do
+  try $ do
     char '@'
     char '('
-    inf <- infixDef funName
+    (pri, (opname, opInfix)) <- infixDef funName
     char ')'
-    return inf
-  OP opdict <- get
-  put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
+    OP opdict <- lift get
+    lift $ put $ OP (M.update (Just . M.insert opname opInfix) pri opdict)
   return Info
 
 funDef :: Parser Statement
@@ -162,7 +173,7 @@ statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 
 expr :: Parser Expr
 expr = do
-  opdict <- get
+  opdict <- lift get
   makeExprParser term (opdictToList opdict)
 
 term :: Parser Expr
@@ -174,7 +185,10 @@ parens = between (symbol "(") (symbol ")")
 statements :: Parser [Statement]       -- 行の区切りは ';'
 statements = statement `sepEndBy` symbol ";"
 
+parseWithState :: ParsecT e s (StateT OPDict Identity) a-> s -> Either (ParseErrorBundle s e) a
+parseWithState parser str = evalState (runParserT parser "<stdin>" str) defaultOP
+
 parseStatement :: String -> [Statement]
-parseStatement str = case parse (evalStateT (sc *> statements) defaultOP) "<stdin>" str of
+parseStatement str = case  parseWithState (sc *> statements) str of
   Right ast   -> ast
   Left bundle -> error $ errorBundlePretty bundle

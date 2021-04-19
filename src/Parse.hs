@@ -174,8 +174,6 @@ statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 expr :: Parser Expr
 expr = do
   opdict <- lift get
-  let OP opdictMap = opdict
-      a = trace (show $ fmap M.keys (M.lookup 9 opdictMap)) opdict
   makeExprParser term (opdictToList opdict)
 
 term :: Parser Expr
@@ -187,7 +185,10 @@ parens = between (symbol "(") (symbol ")")
 statements :: Parser [Statement]       -- 行の区切りは ';'
 statements = statement `sepEndBy` symbol ";"
 
+parseWithState :: ParsecT e s (StateT OPDict Identity) a-> s -> Either (ParseErrorBundle s e) a
+parseWithState parser str = evalState (runParserT parser "<stdin>" str) defaultOP
+
 parseStatement :: String -> [Statement]
-parseStatement str = case evalState (runParserT (sc *> statements) "<stdin>" str) defaultOP of
+parseStatement str = case  parseWithState (sc *> statements) str of
   Right ast   -> ast
   Left bundle -> error $ errorBundlePretty bundle

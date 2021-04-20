@@ -65,6 +65,10 @@ lexeme = L.lexeme sc
 symbol :: String -> Parser String
 symbol = L.symbol sc
 
+-- >>> parseWithState identifier "a93_de"
+-- Right "a93_de"
+-- >>> parseWithState identifier "A_bc'"
+-- Right "A_bc'"
 identifier :: Parser String
 identifier = do
   firstLetter <- letterChar
@@ -72,9 +76,15 @@ identifier = do
   lastLetters <- many (oneOf "_'")
   pure $ firstLetter : (middleLetters ++ lastLetters)
 
+-- >>> parseWithState operator "#!$*"
+-- Right "#!$*"
 operator :: Parser String
 operator = some (oneOf ['!', '#', '$', '%', '&', '*', '+', '.', '/', '<', '=', '>', '?', '^', '|', '-', '~'])
 
+-- >>> isOperator "!#$*+"
+-- True
+-- >>> isOperator "(=~|!"
+-- False
 isOperator :: String -> Bool
 isOperator = all (\char -> char `elem` ['!', '#', '$', '%', '&', '*', '+', '.', '/', '<', '=', '>', '?', '^', '|', '-', '~'])
 
@@ -88,6 +98,9 @@ typeSig :: Parser Type
 typeSig =
   undefined
 
+
+-- >>> parseWithState exprIf "if 3 == 3 then 3 else 5"
+-- Right (ExprIf (ExprEQ (ExprInt 3) (ExprInt 3)) (ExprInt 3) (ExprInt 5))
 exprIf :: Parser Expr
 exprIf = do
     symbol "if"        -- まず "if" を読み
@@ -97,6 +110,8 @@ exprIf = do
     symbol "else"      -- "else" も同様
     ExprIf condExpr thenExpr <$> expr -- 全体を ExprIf でくるむ
 
+-- >>> parseWithState assign "abc = 91"
+-- Right (Assign (Var "abc") (ExprInt 91))
 assign :: Parser Statement
 assign = do
   variname <- Var <$> scIdentifier -- 変数名を見つけたら Var にくるむ
@@ -112,8 +127,11 @@ infixDef funName = do
   OP opdict <- lift get
   lift $ put $ OP (M.update (Just . M.insert opName (inf (opCall funName' <$ symbol opName))) pri opdict)
   return ()
-  --  inf' (try $ opCall funName' <$ symbol opName))
 
+-- >>> parseWithState funInfo "func @(infixL 3)"
+-- Right Info
+-- >>> parseWithState funInfo "(#$) @(infixN 9)"
+-- Right Info
 funInfo :: Parser Statement
 funInfo = do
   funName <- parens operator <|> scIdentifier
@@ -125,6 +143,8 @@ annotation parsers = do
   symbol "@"
   parens $ foldr (<|>) (pure ())  parsers
 
+-- >>> parseWithState funDef "add' a b = a + b"
+-- Right (FunDef "add'" ["a","b"] (ExprAdd (Var "a") (Var "b")))
 funDef :: Parser Statement
 funDef = lexeme $ do
     funName <- (do
@@ -135,6 +155,8 @@ funDef = lexeme $ do
     symbol "="
     FunDef funName args <$> expr
 
+-- >>> parseWithState funCall "func a b c"
+-- Right (FunCall "func" [Var "a",Var "b",Var "c"])
 funCall :: Parser Expr
 funCall = lexeme $ do
     name <- scIdentifier
@@ -144,6 +166,10 @@ funCall = lexeme $ do
 statement :: Parser Statement
 statement = try funInfo <|> try funDef <|> try assign <|> StateExpr <$> expr
 
+-- >>> parseWithState expr "1 + 2 * 3"
+-- Right (ExprAdd (ExprInt 1) (ExprMul (ExprInt 2) (ExprInt 3)))
+-- >>> parseWithState expr "(1 + 2) * 3"
+-- Right (ExprMul (ExprAdd (ExprInt 1) (ExprInt 2)) (ExprInt 3))
 expr :: Parser Expr
 expr = do
   opdict <- lift get
